@@ -803,13 +803,6 @@ if (langBtn) {
   });
 }
 setLang(localStorage.getItem('rmedai_lang') || 'ru');
-    if (cachedHits === null) {
-      setTimeout(()=>{ if (cachedHits!==null) counterEl.textContent = '👁 ' + cachedHits; }, 1500);
-    }
-  } else if (pass !== null) {
-    alert('Неверный пароль');
-  }
-});
 
 /* ===== RU / EN toggle (переводит ключевые блоки сайта) ===== */
 const I18N = {
