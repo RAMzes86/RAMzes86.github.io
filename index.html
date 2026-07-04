@@ -701,26 +701,24 @@ if (mascotEl) {
   });
 }
 
-/* ===== TYPEWRITER on hero h1 ===== */
-(function(){
-  const h1 = document.querySelector('.hero h1');
-  if (!h1) return;
-  const full = h1.innerText;
-  h1.innerText = '';
-  let i = 0;
-  const t = setInterval(() => {
-    h1.innerText += full[i++];
-    if (i >= full.length) clearInterval(t);
-  }, 60);
-})();
-
 /* ===== FADE-IN SECTIONS ON SCROLL ===== */
 (function(){
+  if (!window.IntersectionObserver) return;
   const sections = document.querySelectorAll('.section-wrap, .notice-wrap');
-  sections.forEach(s => { s.style.opacity = '0'; s.style.transform = 'translateY(40px)'; s.style.transition = 'opacity 0.7s ease, transform 0.7s ease'; });
+  sections.forEach(s => {
+    s.style.opacity = '0';
+    s.style.transform = 'translateY(30px)';
+    s.style.transition = 'opacity 0.7s ease, transform 0.7s ease';
+  });
   const obs = new IntersectionObserver(entries => {
-    entries.forEach(e => { if (e.isIntersecting) { e.target.style.opacity = '1'; e.target.style.transform = 'translateY(0)'; } });
-  }, { threshold: 0.1 });
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        e.target.style.opacity = '1';
+        e.target.style.transform = 'translateY(0)';
+        obs.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.08 });
   sections.forEach(s => obs.observe(s));
 })();
 
