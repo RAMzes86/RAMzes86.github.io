@@ -61,7 +61,7 @@ section { position:relative; z-index:1; }
 
 /* MASCOT */
 .hero-mascot { flex-shrink:0; }
-.hero-mascot img { width:280px; filter:drop-shadow(0 0 30px rgba(168,85,247,0.5)); animation:float 4s ease-in-out infinite; }
+.hero-mascot img { width:280px; filter:drop-shadow(0 0 30px rgba(168,85,247,0.5)) drop-shadow(0 0 60px rgba(232,121,249,0.3)); animation:float 4s ease-in-out infinite; transition:transform 0.15s ease; transform-style:preserve-3d; }
 @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-15px)} }
 
 /* NOTICE */
@@ -677,6 +677,134 @@ function animate() {
   requestAnimationFrame(animate);
 }
 animate();
+
+/* ===== CUSTOM GLOW CURSOR ===== */
+const cursor = document.createElement('div');
+cursor.id = 'glow-cursor';
+cursor.style.cssText = 'position:fixed;width:18px;height:18px;border-radius:50%;pointer-events:none;z-index:9999;background:radial-gradient(circle,rgba(192,132,252,0.8),transparent 70%);mix-blend-mode:screen;transition:transform 0.1s;transform:translate(-50%,-50%);';
+document.body.appendChild(cursor);
+document.addEventListener('mousemove', e => {
+  cursor.style.left = e.clientX + 'px';
+  cursor.style.top = e.clientY + 'px';
+});
+
+/* ===== MASCOT FOLLOWS CURSOR ===== */
+const mascotImg = document.querySelector('.hero-mascot img');
+if (mascotImg) {
+  document.addEventListener('mousemove', e => {
+    const rect = mascotImg.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const dx = (e.clientX - cx) / window.innerWidth;
+    const dy = (e.clientY - cy) / window.innerHeight;
+    mascotImg.style.transform = `translateY(-15px) rotateY(${dx * 18}deg) rotateX(${-dy * 10}deg)`;
+  });
+}
+
+/* ===== TYPEWRITER on hero h1 ===== */
+(function(){
+  const h1 = document.querySelector('.hero h1');
+  if (!h1) return;
+  const full = h1.innerText;
+  h1.innerText = '';
+  let i = 0;
+  const t = setInterval(() => {
+    h1.innerText += full[i++];
+    if (i >= full.length) clearInterval(t);
+  }, 60);
+})();
+
+/* ===== FADE-IN SECTIONS ON SCROLL ===== */
+(function(){
+  const sections = document.querySelectorAll('.section-wrap, .notice-wrap');
+  sections.forEach(s => { s.style.opacity = '0'; s.style.transform = 'translateY(40px)'; s.style.transition = 'opacity 0.7s ease, transform 0.7s ease'; });
+  const obs = new IntersectionObserver(entries => {
+    entries.forEach(e => { if (e.isIntersecting) { e.target.style.opacity = '1'; e.target.style.transform = 'translateY(0)'; } });
+  }, { threshold: 0.1 });
+  sections.forEach(s => obs.observe(s));
+})();
+
+/* ===== 3D TILT ON CARDS ===== */
+document.querySelectorAll('.service-card,.pkg-card,.addon-card,.website-card').forEach(card => {
+  card.addEventListener('mousemove', e => {
+    const r = card.getBoundingClientRect();
+    const x = ((e.clientX - r.left) / r.width - 0.5) * 14;
+    const y = ((e.clientY - r.top) / r.height - 0.5) * -14;
+    card.style.transform = `perspective(600px) rotateX(${y}deg) rotateY(${x}deg) translateY(-6px)`;
+  });
+  card.addEventListener('mouseleave', () => { card.style.transform = ''; });
+});
+
+/* ===== RAIN DROPS ===== */
+(function(){
+  const rain = document.createElement('canvas');
+  rain.id = 'rain';
+  rain.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0;opacity:0.18;';
+  document.body.insertBefore(rain, document.body.firstChild);
+  const rc = rain.getContext('2d');
+  rain.width = window.innerWidth;
+  rain.height = window.innerHeight;
+  window.addEventListener('resize', () => { rain.width = window.innerWidth; rain.height = window.innerHeight; });
+  const drops = Array.from({length: 35}, () => ({
+    x: Math.random() * rain.width,
+    y: Math.random() * rain.height,
+    len: Math.random() * 18 + 8,
+    speed: Math.random() * 2.5 + 1.5,
+    alpha: Math.random() * 0.4 + 0.15
+  }));
+  function drawRain(){
+    rc.clearRect(0, 0, rain.width, rain.height);
+    drops.forEach(d => {
+      rc.beginPath();
+      rc.moveTo(d.x, d.y);
+      rc.lineTo(d.x - 1, d.y + d.len);
+      rc.strokeStyle = `rgba(192,132,252,${d.alpha})`;
+      rc.lineWidth = 1;
+      rc.stroke();
+      d.y += d.speed;
+      if (d.y > rain.height) { d.y = -d.len; d.x = Math.random() * rain.width; }
+    });
+    requestAnimationFrame(drawRain);
+  }
+  drawRain();
+})();
+
+/* ===== VISIT COUNTER (password protected) ===== */
+const OWNER_PASSWORD = "RmedAi_2026!";
+const COUNTER_NS = "rmedai-site-counter-v1";
+const counterEl = document.createElement('div');
+counterEl.id = 'visit-counter';
+counterEl.title = 'Счётчик посещений';
+counterEl.style.cssText = 'position:fixed;bottom:18px;right:18px;z-index:999;font-size:13px;color:var(--gray);background:rgba(13,13,26,.85);border:1px solid var(--border2);border-radius:10px;padding:7px 13px;cursor:pointer;backdrop-filter:blur(8px);user-select:none;';
+counterEl.textContent = '👁 —';
+document.body.appendChild(counterEl);
+let cachedHits = null;
+fetch(`https://api.countapi.xyz/hit/${COUNTER_NS}/visits`).then(r=>r.json()).then(d=>{ cachedHits = d.value; }).catch(()=>{});
+counterEl.addEventListener('click', () => {
+  if (counterEl.classList.contains('unlocked')) { counterEl.classList.remove('unlocked'); counterEl.textContent = '👁 —'; return; }
+  const pass = prompt('Пароль:');
+  if (pass === OWNER_PASSWORD) {
+    counterEl.classList.add('unlocked');
+    counterEl.style.color = 'var(--violet-bright)';
+    counterEl.textContent = cachedHits !== null ? ('👁 ' + cachedHits) : '👁 ...';
+    if (cachedHits === null) setTimeout(()=>{ if(cachedHits!==null) counterEl.textContent='👁 '+cachedHits; }, 1500);
+  } else if (pass !== null) alert('Неверный пароль');
+});
+
+/* ===== RU/EN toggle ===== */
+const langBtn = document.getElementById('langToggleBtn');
+function setLang(lang){
+  document.documentElement.setAttribute('data-lang', lang);
+  if (langBtn) langBtn.textContent = lang === 'ru' ? 'EN' : 'RU';
+  localStorage.setItem('rmedai_lang', lang);
+}
+if (langBtn) {
+  langBtn.addEventListener('click', ()=>{
+    const cur = document.documentElement.getAttribute('data-lang') || 'ru';
+    setLang(cur === 'ru' ? 'en' : 'ru');
+  });
+}
+setLang(localStorage.getItem('rmedai_lang') || 'ru');
 
 /* ===== Visit counter (password protected) ===== */
 const OWNER_PASSWORD = "rmed2026"; // смени на свой пароль
