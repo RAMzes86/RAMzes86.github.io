@@ -689,15 +689,15 @@ document.addEventListener('mousemove', e => {
 });
 
 /* ===== MASCOT FOLLOWS CURSOR ===== */
-const mascotImg = document.querySelector('.hero-mascot img');
-if (mascotImg) {
+const mascotEl = document.querySelector('.hero-mascot img');
+if (mascotEl) {
   document.addEventListener('mousemove', e => {
-    const rect = mascotImg.getBoundingClientRect();
+    const rect = mascotEl.getBoundingClientRect();
     const cx = rect.left + rect.width / 2;
     const cy = rect.top + rect.height / 2;
     const dx = (e.clientX - cx) / window.innerWidth;
     const dy = (e.clientY - cy) / window.innerHeight;
-    mascotImg.style.transform = `translateY(-15px) rotateY(${dx * 18}deg) rotateX(${-dy * 10}deg)`;
+    mascotEl.style.transform = `translateY(-15px) rotateY(${dx * 18}deg) rotateX(${-dy * 10}deg)`;
   });
 }
 
