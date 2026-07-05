@@ -23,11 +23,11 @@
 * { margin:0; padding:0; box-sizing:border-box; }
 html { font-size: 120%; }
 body { background:var(--bg); color:var(--white); font-family:'Inter',sans-serif; overflow-x:hidden; }
-#cosmic-scene { position:fixed; top:0; left:0; width:100%; height:100%; z-index:0; cursor:grab; touch-action:none; }
+#cosmic-scene { position:fixed; top:0; left:0; width:100%; height:100%; z-index:0; cursor:grab; touch-action:pan-y; }
 #cosmic-scene:active { cursor:grabbing; }
 #sound-toggle { position:fixed; bottom:20px; right:20px; z-index:200; width:46px; height:46px; border-radius:50%; border:1px solid var(--border2); background:rgba(13,13,26,0.85); backdrop-filter:blur(10px); color:var(--violet-bright); font-size:1.2rem; cursor:pointer; display:flex; align-items:center; justify-content:center; box-shadow:0 0 20px rgba(124,58,237,0.35); transition:all 0.3s; }
 #sound-toggle:hover { box-shadow:0 0 32px rgba(168,85,247,0.6); transform:scale(1.08); }
-.orb { position:fixed; border-radius:50%; filter:blur(100px); pointer-events:none; z-index:0; }
+.orb { position:fixed; border-radius:50%; filter:blur(100px); pointer-events:none; z-index:1; }
 .orb-1 { width:600px; height:600px; background:radial-gradient(circle,rgba(124,58,237,0.25),transparent); top:-150px; right:-150px; }
 .orb-2 { width:500px; height:500px; background:radial-gradient(circle,rgba(168,85,247,0.2),transparent); bottom:10%; left:-150px; }
 .orb-3 { width:350px; height:350px; background:radial-gradient(circle,rgba(232,121,249,0.15),transparent); top:40%; right:5%; }
@@ -640,10 +640,10 @@ footer strong { color:var(--violet); }
   controls.autoRotateSpeed = 0.35;
   controls.minPolarAngle = Math.PI * 0.25;
   controls.maxPolarAngle = Math.PI * 0.75;
-  if (!isFinePointer) { controls.touches = { ONE: THREE.TOUCH.NONE, TWO: THREE.TOUCH.DOLLY_PAN }; }
+  if (!isFinePointer) { controls.touches = { ONE: THREE.TOUCH.NONE, TWO: THREE.TOUCH.NONE }; controls.enableRotate = false; }
 
-  scene.add(new THREE.AmbientLight(0x8899bb, 0.4));
-  const coreLight = new THREE.PointLight(0xfff2d9, 2.6, 260, 2);
+  scene.add(new THREE.AmbientLight(0x99aacc, 0.5));
+  const coreLight = new THREE.PointLight(0xfff2d9, 3.0, 260, 2);
   coreLight.position.set(0, 0, 0);
   scene.add(coreLight);
   const rimLight = new THREE.DirectionalLight(0xe879f9, 0.35);
@@ -776,19 +776,19 @@ footer strong { color:var(--violet); }
   }
 
   const planetDefs = [
-    { size:0.9,  dist:13, color:'#8c7d6b', band:'#b8a996', speed:1.6,  ring:false, name:'Меркурий' },
-    { size:1.2,  dist:17, color:'#e0c16c', band:'#f5deb3', speed:1.15, ring:false, name:'Венера'   },
-    { size:1.3,  dist:22, color:'#2b6cb0', band:'#eaf6ff', speed:0.85, ring:false, name:'Земля'    },
-    { size:1.0,  dist:27, color:'#b7410e', band:'#e0956b', speed:0.65, ring:false, name:'Марс'     },
-    { size:2.1,  dist:33, color:'#d9a066', band:'#f3d9b1', speed:0.5,  ring:false, name:'Юпитер'   },
-    { size:1.7,  dist:38, color:'#e8d9a0', band:'#fff4d1', speed:0.4,  ring:true,  name:'Сатурн'   }
+    { size:0.9,  dist:13, color:'#c9a06a', band:'#f0ddb8', speed:1.6,  ring:false, name:'Меркурий' },
+    { size:1.2,  dist:17, color:'#ffcf4d', band:'#fff2b0', speed:1.15, ring:false, name:'Венера'   },
+    { size:1.3,  dist:22, color:'#1e88e5', band:'#7be0a8', speed:0.85, ring:false, name:'Земля'    },
+    { size:1.0,  dist:27, color:'#ff4d1c', band:'#ff9d6b', speed:0.65, ring:false, name:'Марс'     },
+    { size:2.1,  dist:33, color:'#ff9d3d', band:'#ffe0a3', speed:0.5,  ring:false, name:'Юпитер'   },
+    { size:1.7,  dist:38, color:'#ffe066', band:'#fff6cc', speed:0.4,  ring:true,  name:'Сатурн'   }
   ];
 
   const planets = planetDefs.map((def, idx) => {
     const group = new THREE.Group();
     const mesh = new THREE.Mesh(
       new THREE.SphereGeometry(def.size, 32, 32),
-      new THREE.MeshStandardMaterial({ map: planetTexture(def.color, def.band), roughness:0.75, metalness:0.15, emissive:new THREE.Color(def.color), emissiveIntensity:0.08 })
+      new THREE.MeshStandardMaterial({ map: planetTexture(def.color, def.band), roughness:0.55, metalness:0.1, emissive:new THREE.Color(def.color), emissiveIntensity:0.3 })
     );
     group.add(mesh);
     if (def.ring) {
@@ -813,6 +813,69 @@ footer strong { color:var(--violet); }
     renderer.setSize(window.innerWidth, window.innerHeight);
   }
   window.addEventListener('resize', onResize);
+
+  /* ---- occasional comets ---- */
+  function cometTrailTexture(hex) {
+    const w = 256, h = 16;
+    const c = document.createElement('canvas'); c.width = w; c.height = h;
+    const g = c.getContext('2d');
+    const grad = g.createLinearGradient(0, 0, w, 0);
+    grad.addColorStop(0.0, hex + '00');
+    grad.addColorStop(0.7, hex + '55');
+    grad.addColorStop(1.0, hex + 'ff');
+    g.fillStyle = grad;
+    g.fillRect(0, 0, w, h);
+    return new THREE.CanvasTexture(c);
+  }
+  const cometColors = ['#bcd9ff', '#e0c3ff', '#fff2d0', '#c9f2ff'];
+  const comets = [];
+  let cometTimer = 6 + Math.random() * 10;
+
+  function spawnComet() {
+    const dir = new THREE.Vector3(Math.random() * 2 - 1, Math.random() * 0.5 - 0.25, Math.random() * 2 - 1).normalize();
+    const perp = new THREE.Vector3(-dir.z, 0, dir.x).normalize();
+    const start = dir.clone().multiplyScalar(-150)
+      .addScaledVector(perp, (Math.random() - 0.5) * 70)
+      .add(new THREE.Vector3(0, (Math.random() - 0.5) * 40, 0));
+
+    const hex = cometColors[Math.floor(Math.random() * cometColors.length)];
+    const trailLen = 12 + Math.random() * 10;
+    const trailGeo = new THREE.PlaneGeometry(trailLen, 0.3);
+    trailGeo.translate(-trailLen / 2, 0, 0);
+    const trailMat = new THREE.MeshBasicMaterial({ map: cometTrailTexture(hex), transparent:true, blending:THREE.AdditiveBlending, depthWrite:false, side:THREE.DoubleSide });
+    const trail = new THREE.Mesh(trailGeo, trailMat);
+    trail.quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), dir);
+
+    const head = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(hex), transparent:true, blending:THREE.AdditiveBlending, depthWrite:false }));
+    head.scale.set(1.6, 1.6, 1);
+
+    const group = new THREE.Group();
+    group.add(trail); group.add(head);
+    group.position.copy(start);
+    scene.add(group);
+
+    comets.push({ group, trailMat, dir, speed: 55 + Math.random() * 35, life: 0, maxLife: 3 + Math.random() * 1.5 });
+  }
+
+  function updateComets(dt) {
+    cometTimer -= dt;
+    if (cometTimer <= 0 && comets.length < 2) {
+      spawnComet();
+      cometTimer = 14 + Math.random() * 22;
+    }
+    for (let i = comets.length - 1; i >= 0; i--) {
+      const c = comets[i];
+      c.life += dt;
+      c.group.position.addScaledVector(c.dir, c.speed * dt);
+      const fadeIn = Math.min(c.life / 0.4, 1);
+      const fadeOut = Math.min((c.maxLife - c.life) / 0.6, 1);
+      c.trailMat.opacity = Math.max(0, Math.min(fadeIn, fadeOut));
+      if (c.life >= c.maxLife) {
+        scene.remove(c.group);
+        comets.splice(i, 1);
+      }
+    }
+  }
 
   /* ---- animation loop ---- */
   const clock = new THREE.Clock();
@@ -839,6 +902,8 @@ footer strong { color:var(--violet); }
       p.mesh.rotation.y += dt * 0.4;
     });
 
+    updateComets(dt);
+
     controls.update();
     renderer.render(scene, camera);
     requestAnimationFrame(animate);
@@ -857,30 +922,28 @@ footer strong { color:var(--violet); }
    Играет собственная сгенерированная космическая партия — она не копирует
    мелодию Циммера (это запрещено законом об авторском праве), но сделана
    в похожем настроении: низкий органный дрон + редкие "пианинные" ноты.
+
+   ВАЖНО: AudioContext создаётся СИНХРОННО прямо внутри обработчика клика/тапа —
+   это обязательное требование браузеров для автовоспроизведения звука.
 */
 (function(){
   const btn = document.getElementById('sound-toggle');
   if (!btn) return;
-  let ctx, master, started = false, mode = null; // mode: 'file' | 'synth'
+  let ctx, master, filterNode, started = false, mode = null; // mode: 'file' | 'synth'
   let audioEl = null;
   let muted = localStorage.getItem('rmedai_sound_muted') === 'true';
   btn.textContent = muted ? '🔇' : '🔈';
 
-  function buildSynthAmbient() {
-    ctx = new (window.AudioContext || window.webkitAudioContext)();
-    master = ctx.createGain();
-    master.gain.value = muted ? 0 : 0.055;
-    master.connect(ctx.destination);
-
-    const filter = ctx.createBiquadFilter();
-    filter.type = 'lowpass';
-    filter.frequency.value = 850;
-    filter.connect(master);
+  function buildSynthGraph() {
+    filterNode = ctx.createBiquadFilter();
+    filterNode.type = 'lowpass';
+    filterNode.frequency.value = 850;
+    filterNode.connect(master);
 
     // organ-like low drone — several detuned partials, slowly swelling
     const droneGain = ctx.createGain();
     droneGain.gain.value = 0;
-    droneGain.connect(filter);
+    droneGain.connect(filterNode);
     [55, 55.6, 82.5, 110, 110.4].forEach((freq, i) => {
       const osc = ctx.createOscillator();
       osc.type = i % 2 === 0 ? 'sine' : 'triangle';
@@ -897,13 +960,13 @@ footer strong { color:var(--violet); }
     lfo.frequency.value = 0.045;
     const lfoGain = ctx.createGain();
     lfoGain.gain.value = 260;
-    lfo.connect(lfoGain); lfoGain.connect(filter.frequency);
+    lfo.connect(lfoGain); lfoGain.connect(filterNode.frequency);
     lfo.start();
 
     // sparse distant piano-like notes, minor/cosmic feel, never repeating a fixed tune
     const scale = [220, 246.94, 261.63, 293.66, 329.63, 392, 440]; // A minor-ish
     function pluck() {
-      if (!ctx) return;
+      if (!ctx || mode !== 'synth') return;
       const freq = scale[Math.floor(Math.random() * scale.length)];
       const o = ctx.createOscillator();
       o.type = 'sine';
@@ -918,56 +981,64 @@ footer strong { color:var(--violet); }
       o.connect(g); g.connect(master);
       o2.connect(g2); g2.connect(master);
       const now = ctx.currentTime;
-      g.gain.linearRampToValueAtTime(0.05, now + 1.5);
+      g.gain.linearRampToValueAtTime(0.09, now + 1.5);
       g.gain.linearRampToValueAtTime(0, now + 8);
-      g2.gain.linearRampToValueAtTime(0.015, now + 1.5);
+      g2.gain.linearRampToValueAtTime(0.03, now + 1.5);
       g2.gain.linearRampToValueAtTime(0, now + 8);
       o.start(now); o.stop(now + 8.2);
       o2.start(now); o2.stop(now + 8.2);
       setTimeout(pluck, 6000 + Math.random() * 8000);
     }
-    setTimeout(pluck, 3000);
+    setTimeout(pluck, 2500);
+    mode = 'synth';
   }
 
   function tryLicensedFile() {
-    return new Promise((resolve) => {
-      const a = new Audio();
-      a.src = 'assets/theme-music.mp3';
-      a.loop = true;
-      a.volume = muted ? 0 : 0.35;
-      a.addEventListener('canplaythrough', () => resolve(a), { once:true });
-      a.addEventListener('error', () => resolve(null), { once:true });
-      setTimeout(() => resolve(null), 2500); // no file found — move on quickly
-    });
+    audioEl = new Audio();
+    audioEl.loop = true;
+    audioEl.volume = muted ? 0 : 0.35;
+    audioEl.addEventListener('canplaythrough', () => { mode = 'file'; }, { once:true });
+    audioEl.addEventListener('error', () => {
+      // файла нет — переключаемся на встроенный синтезатор
+      audioEl = null;
+      buildSynthGraph();
+      master.gain.value = muted ? 0 : 0.14;
+    }, { once:true });
+    audioEl.src = 'assets/theme-music.mp3';
+    audioEl.play().then(() => { mode = 'file'; }).catch(() => {});
   }
 
-  async function startAudio() {
+  // ВСЁ создание AudioContext происходит синхронно, в стеке вызова клика/тапа —
+  // иначе Chrome/Safari оставят контекст в состоянии 'suspended' навсегда.
+  function startAudio() {
     if (started) return;
     started = true;
-    const file = await tryLicensedFile();
-    if (file) {
-      mode = 'file';
-      audioEl = file;
-      audioEl.play().catch(()=>{});
-    } else {
-      mode = 'synth';
-      buildSynthAmbient();
-    }
+    ctx = new (window.AudioContext || window.webkitAudioContext)();
+    master = ctx.createGain();
+    master.gain.value = 0; // стартуем с нуля и плавно поднимаем громкость
+    master.connect(ctx.destination);
+    if (ctx.state === 'suspended') ctx.resume();
+
+    tryLicensedFile();
+    // если через полсекунды файл не подтвердил себя (canplaythrough/play), считаем что его нет
+    setTimeout(() => { if (mode === null) buildSynthGraph(); }, 600);
+
+    if (!muted) master.gain.linearRampToValueAtTime(0.14, ctx.currentTime + 1.2);
   }
 
   function setMuted(m) {
     muted = m;
     localStorage.setItem('rmedai_sound_muted', String(m));
     btn.textContent = m ? '🔇' : '🔈';
-    if (mode === 'file' && audioEl) {
-      audioEl.volume = m ? 0 : 0.35;
-    } else if (mode === 'synth' && master && ctx) {
-      master.gain.linearRampToValueAtTime(m ? 0 : 0.055, ctx.currentTime + 0.6);
+    if (audioEl) audioEl.volume = m ? 0 : 0.35;
+    if (master && ctx) {
+      master.gain.linearRampToValueAtTime(m ? 0 : 0.14, ctx.currentTime + 0.6);
       if (!m && ctx.state === 'suspended') ctx.resume();
     }
   }
 
-  // начинаем тихо после первого клика/тапа пользователя (так требуют браузеры)
+  // начинаем после первого клика/тапа/нажатия клавиши — так требуют браузеры,
+  // AudioContext создаётся синхронно внутри этого же обработчика
   function firstGesture() {
     startAudio();
     document.removeEventListener('pointerdown', firstGesture);
