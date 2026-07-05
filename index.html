@@ -25,8 +25,8 @@ html { font-size: 120%; }
 body { background:var(--bg); color:var(--white); font-family:'Inter',sans-serif; overflow-x:hidden; }
 #cosmic-scene { position:fixed; top:0; left:0; width:100%; height:100%; z-index:0; cursor:grab; touch-action:pan-y; }
 #cosmic-scene:active { cursor:grabbing; }
-#sound-toggle { position:fixed; bottom:20px; right:20px; z-index:200; width:46px; height:46px; border-radius:50%; border:1px solid var(--border2); background:rgba(13,13,26,0.85); backdrop-filter:blur(10px); color:var(--violet-bright); font-size:1.2rem; cursor:pointer; display:flex; align-items:center; justify-content:center; box-shadow:0 0 20px rgba(124,58,237,0.35); transition:all 0.3s; }
-#sound-toggle:hover { box-shadow:0 0 32px rgba(168,85,247,0.6); transform:scale(1.08); }
+#sound-toggle { position:fixed; bottom:24px; right:24px; z-index:200; width:52px; height:52px; border-radius:50%; border:2px solid rgba(168,85,247,0.6); background:rgba(13,13,26,0.9); backdrop-filter:blur(12px); color:#e879f9; font-size:1.5rem; cursor:pointer; display:flex; align-items:center; justify-content:center; box-shadow:0 0 24px rgba(124,58,237,0.5), inset 0 0 12px rgba(168,85,247,0.15); transition:all 0.3s; pointer-events:auto; }
+#sound-toggle:hover { box-shadow:0 0 40px rgba(168,85,247,0.7), inset 0 0 16px rgba(168,85,247,0.25); transform:scale(1.12); }
 .orb { position:fixed; border-radius:50%; filter:blur(100px); pointer-events:none; z-index:1; }
 .orb-1 { width:600px; height:600px; background:radial-gradient(circle,rgba(124,58,237,0.25),transparent); top:-150px; right:-150px; }
 .orb-2 { width:500px; height:500px; background:radial-gradient(circle,rgba(168,85,247,0.2),transparent); bottom:10%; left:-150px; }
@@ -760,20 +760,177 @@ footer strong { color:var(--violet); }
   })();
 
   /* ---- planet parade ---- */
-  function planetTexture(baseColor, bandColor) {
-    const w = 128, h = 128;
-    const c = document.createElement('canvas'); c.width = w; c.height = h;
-    const g = c.getContext('2d');
-    g.fillStyle = baseColor; g.fillRect(0,0,w,h);
-    for (let i=0;i<6;i++) {
-      g.fillStyle = bandColor;
-      g.globalAlpha = 0.12 + Math.random()*0.15;
-      const y = Math.random()*h;
-      g.fillRect(0, y, w, 3 + Math.random()*10);
+
+  /* procedural noise helpers */
+  function noise2d(x, y) {
+    const n = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
+    return n - Math.floor(n);
+  }
+  function fbm(x, y, octaves) {
+    let v = 0, amp = 0.5, freq = 1;
+    for (let i = 0; i < octaves; i++) {
+      v += amp * noise2d(x * freq, y * freq);
+      amp *= 0.5; freq *= 2.1;
     }
-    g.globalAlpha = 1;
+    return v;
+  }
+  function lerpColor(c1, c2, t) {
+    return [c1[0]+(c2[0]-c1[0])*t, c1[1]+(c2[1]-c1[1])*t, c1[2]+(c2[2]-c1[2])*t];
+  }
+
+  function makeEarthTexture() {
+    const w = 512, h = 256, c = document.createElement('canvas'); c.width = w; c.height = h;
+    const g = c.getContext('2d');
+    const deepOcean = [15,50,150], shallowOcean = [30,100,200];
+    const land1 = [34,120,50], land2 = [90,155,60], desert = [180,160,100], mountain = [130,115,85], snow = [240,245,255];
+    const img = g.createImageData(w, h);
+    for (let y = 0; y < h; y++) {
+      const lat = (y / h) * Math.PI;
+      for (let x = 0; x < w; x++) {
+        const lon = (x / w) * Math.PI * 2;
+        const nx = Math.cos(lon)*Math.sin(lat), ny = Math.cos(lat), nz = Math.sin(lon)*Math.sin(lat);
+        const elev = fbm(nx*2.5, nz*2.5 + ny*1.5, 6);
+        const latF = Math.abs(y/h - 0.5) * 2;
+        let col;
+        if (elev < 0.42) col = lerpColor(deepOcean, shallowOcean, elev/0.42);
+        else if (latF > 0.85) col = snow;
+        else if (latF < 0.2 && elev < 0.55) col = lerpColor(land1, desert, (elev-0.42)/0.13);
+        else if (elev > 0.7) col = lerpColor(mountain, snow, (elev-0.7)/0.3);
+        else col = lerpColor(land1, land2, (elev-0.42)/0.28);
+        const cloud = fbm(nx*3+0.5, nz*3+ny*2, 4);
+        if (cloud > 0.55) { const ci = Math.min((cloud-0.55)/0.2, 1)*0.7; col = lerpColor(col, [255,255,255], ci); }
+        const idx = (y*w+x)*4;
+        img.data[idx]=col[0]; img.data[idx+1]=col[1]; img.data[idx+2]=col[2]; img.data[idx+3]=255;
+      }
+    }
+    g.putImageData(img, 0, 0);
     return new THREE.CanvasTexture(c);
   }
+
+  function makeMarsTexture() {
+    const w = 512, h = 256, c = document.createElement('canvas'); c.width = w; c.height = h;
+    const g = c.getContext('2d');
+    const base = [190,80,30], dark = [140,55,20], light = [220,150,100], polar = [230,225,220];
+    const img = g.createImageData(w, h);
+    for (let y = 0; y < h; y++) {
+      const lat = (y/h)*Math.PI;
+      for (let x = 0; x < w; x++) {
+        const lon = (x/w)*Math.PI*2;
+        const nx = Math.cos(lon)*Math.sin(lat), ny = Math.cos(lat), nz = Math.sin(lon)*Math.sin(lat);
+        const v = fbm(nx*3, nz*3+ny*2, 5);
+        const latF = Math.abs(y/h - 0.5)*2;
+        let col = lerpColor(dark, base, v);
+        if (v > 0.6) col = lerpColor(col, light, (v-0.6)/0.4);
+        const cr = fbm(nx*8, nz*8, 3);
+        if (cr > 0.7) col = lerpColor(col, dark, (cr-0.7)/0.3*0.5);
+        if (latF > 0.88) col = lerpColor(col, polar, (latF-0.88)/0.12);
+        const idx = (y*w+x)*4;
+        img.data[idx]=col[0]; img.data[idx+1]=col[1]; img.data[idx+2]=col[2]; img.data[idx+3]=255;
+      }
+    }
+    g.putImageData(img, 0, 0);
+    return new THREE.CanvasTexture(c);
+  }
+
+  function makeMercuryTexture() {
+    const w = 512, h = 256, c = document.createElement('canvas'); c.width = w; c.height = h;
+    const g = c.getContext('2d');
+    const base = [160,150,135], dark = [100,90,80], light = [195,185,170];
+    const img = g.createImageData(w, h);
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const lon = (x/w)*Math.PI*2, lat = (y/h)*Math.PI;
+        const nx = Math.cos(lon)*Math.sin(lat), nz = Math.sin(lon)*Math.sin(lat), ny = Math.cos(lat);
+        const v = fbm(nx*4, nz*4+ny*2, 5);
+        let col = lerpColor(base, light, v);
+        const cr = fbm(nx*12+3, nz*12+1, 3);
+        if (cr > 0.6) col = lerpColor(col, dark, (cr-0.6)/0.4*0.7);
+        const cr2 = fbm(nx*20, nz*20, 2);
+        if (cr2 > 0.72) col = lerpColor(col, dark, (cr2-0.72)/0.28*0.4);
+        const idx = (y*w+x)*4;
+        img.data[idx]=col[0]; img.data[idx+1]=col[1]; img.data[idx+2]=col[2]; img.data[idx+3]=255;
+      }
+    }
+    g.putImageData(img, 0, 0);
+    return new THREE.CanvasTexture(c);
+  }
+
+  function makeVenusTexture() {
+    const w = 512, h = 256, c = document.createElement('canvas'); c.width = w; c.height = h;
+    const g = c.getContext('2d');
+    const swirl1 = [240,210,130], swirl2 = [200,170,70];
+    const img = g.createImageData(w, h);
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const lon = (x/w)*Math.PI*2, lat = (y/h)*Math.PI;
+        const nx = Math.cos(lon)*Math.sin(lat), nz = Math.sin(lon)*Math.sin(lat), ny = Math.cos(lat);
+        const v = fbm(nx*2.5+ny*0.5, nz*2.5, 5);
+        const band = Math.sin(y/h*Math.PI*8 + v*4)*0.5+0.5;
+        let col = lerpColor(swirl2, swirl1, band*0.5+v*0.5);
+        const cloud = fbm(nx*4+1, nz*4+ny, 4);
+        if (cloud > 0.45) col = lerpColor(col, [250,235,170], (cloud-0.45)/0.55*0.5);
+        const idx = (y*w+x)*4;
+        img.data[idx]=col[0]; img.data[idx+1]=col[1]; img.data[idx+2]=col[2]; img.data[idx+3]=255;
+      }
+    }
+    g.putImageData(img, 0, 0);
+    return new THREE.CanvasTexture(c);
+  }
+
+  function makeJupiterTexture() {
+    const w = 512, h = 256, c = document.createElement('canvas'); c.width = w; c.height = h;
+    const g = c.getContext('2d');
+    const bands = [[210,160,90],[240,190,120],[180,120,60],[250,210,150],[200,140,70],[235,200,140]];
+    const img = g.createImageData(w, h);
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const lon = (x/w)*Math.PI*2, lat = (y/h)*Math.PI;
+        const nx = Math.cos(lon)*Math.sin(lat), nz = Math.sin(lon)*Math.sin(lat), ny = Math.cos(lat);
+        const turb = fbm(nx*3+0.7, nz*1+ny*0.3, 4)*0.35;
+        const bandIdx = ((y/h*12+turb*6)%bands.length+bands.length)%bands.length;
+        const bi = Math.floor(bandIdx), bf = bandIdx - bi;
+        let col = lerpColor(bands[bi%bands.length], bands[(bi+1)%bands.length], bf);
+        const spotX = (x/w - 0.35), spotY = (y/h - 0.6);
+        const spotDist = Math.sqrt(spotX*spotX*4 + spotY*spotY*16);
+        if (spotDist < 0.08) col = lerpColor(col, [200,80,40], (1-spotDist/0.08)*0.8);
+        const idx = (y*w+x)*4;
+        img.data[idx]=col[0]; img.data[idx+1]=col[1]; img.data[idx+2]=col[2]; img.data[idx+3]=255;
+      }
+    }
+    g.putImageData(img, 0, 0);
+    return new THREE.CanvasTexture(c);
+  }
+
+  function makeSaturnTexture() {
+    const w = 512, h = 256, c = document.createElement('canvas'); c.width = w; c.height = h;
+    const g = c.getContext('2d');
+    const bands = [[230,210,150],[240,220,170],[210,190,130],[245,230,180],[220,200,140]];
+    const img = g.createImageData(w, h);
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const lon = (x/w)*Math.PI*2, lat = (y/h)*Math.PI;
+        const nx = Math.cos(lon)*Math.sin(lat), nz = Math.sin(lon)*Math.sin(lat), ny = Math.cos(lat);
+        const turb = fbm(nx*2, nz*1+ny*0.2, 4)*0.2;
+        const bandIdx = ((y/h*10+turb*4)%bands.length+bands.length)%bands.length;
+        const bi = Math.floor(bandIdx), bf = bandIdx - bi;
+        let col = lerpColor(bands[bi%bands.length], bands[(bi+1)%bands.length], bf);
+        const idx = (y*w+x)*4;
+        img.data[idx]=col[0]; img.data[idx+1]=col[1]; img.data[idx+2]=col[2]; img.data[idx+3]=255;
+      }
+    }
+    g.putImageData(img, 0, 0);
+    return new THREE.CanvasTexture(c);
+  }
+
+  const planetTextureMakers = {
+    '\u041c\u0435\u0440\u043a\u0443\u0440\u0438\u0439': makeMercuryTexture,
+    '\u0412\u0435\u043d\u0435\u0440\u0430':   makeVenusTexture,
+    '\u0417\u0435\u043c\u043b\u044f':    makeEarthTexture,
+    '\u041c\u0430\u0440\u0441':     makeMarsTexture,
+    '\u042e\u043f\u0438\u0442\u0435\u0440':   makeJupiterTexture,
+    '\u0421\u0430\u0442\u0443\u0440\u043d':   makeSaturnTexture
+  };
+
 
   const planetDefs = [
     { size:0.9,  dist:13, color:'#c9a06a', band:'#f0ddb8', speed:1.6,  ring:false, name:'Меркурий' },
@@ -786,9 +943,11 @@ footer strong { color:var(--violet); }
 
   const planets = planetDefs.map((def, idx) => {
     const group = new THREE.Group();
+    const texMaker = planetTextureMakers[def.name];
+    const tex = texMaker ? texMaker() : null;
     const mesh = new THREE.Mesh(
-      new THREE.SphereGeometry(def.size, 32, 32),
-      new THREE.MeshStandardMaterial({ map: planetTexture(def.color, def.band), roughness:0.55, metalness:0.1, emissive:new THREE.Color(def.color), emissiveIntensity:0.3 })
+      new THREE.SphereGeometry(def.size, 48, 48),
+      new THREE.MeshStandardMaterial({ map: tex, roughness:0.55, metalness:0.1, emissive:new THREE.Color(def.color), emissiveIntensity:0.2 })
     );
     group.add(mesh);
     if (def.ring) {
@@ -911,134 +1070,34 @@ footer strong { color:var(--violet); }
   animate();
 })();
 
-/* ===== ФОНОВАЯ МУЗЫКА =====
-   ВАРИАНТ 1 (рекомендуется, если хочешь настоящую атмосферу под "Интерстеллар"):
-   Купи/лицензируй похожий трек (например на Epidemic Sound, Artlist, AudioJungle —
-   поиск "space epic ambient organ") и положи файл сюда:
-     /assets/theme-music.mp3
-   Скрипт сам его найдёт и будет крутить в тихом лупе вместо синтезированной музыки.
-
-   ВАРИАНТ 2 (по умолчанию, если файла нет):
-   Играет собственная сгенерированная космическая партия — она не копирует
-   мелодию Циммера (это запрещено законом об авторском праве), но сделана
-   в похожем настроении: низкий органный дрон + редкие "пианинные" ноты.
-
-   ВАЖНО: AudioContext создаётся СИНХРОННО прямо внутри обработчика клика/тапа —
-   это обязательное требование браузеров для автовоспроизведения звука.
-*/
+/* ===== ФОНОВАЯ МУЗЫКА (файл assets/theme-music.mp3) ===== */
 (function(){
   const btn = document.getElementById('sound-toggle');
   if (!btn) return;
-  let ctx, master, filterNode, started = false, mode = null; // mode: 'file' | 'synth'
-  let audioEl = null;
+  let audio = null, started = false;
   let muted = localStorage.getItem('rmedai_sound_muted') === 'true';
-  btn.textContent = muted ? '🔇' : '🔈';
+  btn.textContent = muted ? '🔇' : '🔊';
 
-  function buildSynthGraph() {
-    filterNode = ctx.createBiquadFilter();
-    filterNode.type = 'lowpass';
-    filterNode.frequency.value = 850;
-    filterNode.connect(master);
-
-    // organ-like low drone — several detuned partials, slowly swelling
-    const droneGain = ctx.createGain();
-    droneGain.gain.value = 0;
-    droneGain.connect(filterNode);
-    [55, 55.6, 82.5, 110, 110.4].forEach((freq, i) => {
-      const osc = ctx.createOscillator();
-      osc.type = i % 2 === 0 ? 'sine' : 'triangle';
-      osc.frequency.value = freq;
-      const g = ctx.createGain();
-      g.gain.value = 0.16 / (i + 1);
-      osc.connect(g); g.connect(droneGain);
-      osc.start();
-    });
-    droneGain.gain.linearRampToValueAtTime(1, ctx.currentTime + 6);
-
-    // slow LFO breathing the filter cutoff for movement, like a held chord swelling
-    const lfo = ctx.createOscillator();
-    lfo.frequency.value = 0.045;
-    const lfoGain = ctx.createGain();
-    lfoGain.gain.value = 260;
-    lfo.connect(lfoGain); lfoGain.connect(filterNode.frequency);
-    lfo.start();
-
-    // sparse distant piano-like notes, minor/cosmic feel, never repeating a fixed tune
-    const scale = [220, 246.94, 261.63, 293.66, 329.63, 392, 440]; // A minor-ish
-    function pluck() {
-      if (!ctx || mode !== 'synth') return;
-      const freq = scale[Math.floor(Math.random() * scale.length)];
-      const o = ctx.createOscillator();
-      o.type = 'sine';
-      o.frequency.value = freq;
-      const o2 = ctx.createOscillator();
-      o2.type = 'sine';
-      o2.frequency.value = freq * 2;
-      const g = ctx.createGain();
-      g.gain.value = 0;
-      const g2 = ctx.createGain();
-      g2.gain.value = 0;
-      o.connect(g); g.connect(master);
-      o2.connect(g2); g2.connect(master);
-      const now = ctx.currentTime;
-      g.gain.linearRampToValueAtTime(0.09, now + 1.5);
-      g.gain.linearRampToValueAtTime(0, now + 8);
-      g2.gain.linearRampToValueAtTime(0.03, now + 1.5);
-      g2.gain.linearRampToValueAtTime(0, now + 8);
-      o.start(now); o.stop(now + 8.2);
-      o2.start(now); o2.stop(now + 8.2);
-      setTimeout(pluck, 6000 + Math.random() * 8000);
-    }
-    setTimeout(pluck, 2500);
-    mode = 'synth';
-  }
-
-  function tryLicensedFile() {
-    audioEl = new Audio();
-    audioEl.loop = true;
-    audioEl.volume = muted ? 0 : 0.35;
-    audioEl.addEventListener('canplaythrough', () => { mode = 'file'; }, { once:true });
-    audioEl.addEventListener('error', () => {
-      // файла нет — переключаемся на встроенный синтезатор
-      audioEl = null;
-      buildSynthGraph();
-      master.gain.value = muted ? 0 : 0.14;
-    }, { once:true });
-    audioEl.src = 'assets/theme-music.mp3';
-    audioEl.play().then(() => { mode = 'file'; }).catch(() => {});
-  }
-
-  // ВСЁ создание AudioContext происходит синхронно, в стеке вызова клика/тапа —
-  // иначе Chrome/Safari оставят контекст в состоянии 'suspended' навсегда.
   function startAudio() {
     if (started) return;
     started = true;
-    ctx = new (window.AudioContext || window.webkitAudioContext)();
-    master = ctx.createGain();
-    master.gain.value = 0; // стартуем с нуля и плавно поднимаем громкость
-    master.connect(ctx.destination);
-    if (ctx.state === 'suspended') ctx.resume();
-
-    tryLicensedFile();
-    // если через полсекунды файл не подтвердил себя (canplaythrough/play), считаем что его нет
-    setTimeout(() => { if (mode === null) buildSynthGraph(); }, 600);
-
-    if (!muted) master.gain.linearRampToValueAtTime(0.14, ctx.currentTime + 1.2);
+    audio = new Audio('assets/theme-music.mp3');
+    audio.loop = true;
+    audio.volume = muted ? 0 : 0.3;
+    audio.play().catch(() => {});
+    audio.addEventListener('error', () => {
+      // файла нет — прячем кнопку
+      btn.style.display = 'none';
+    }, { once:true });
   }
 
   function setMuted(m) {
     muted = m;
     localStorage.setItem('rmedai_sound_muted', String(m));
-    btn.textContent = m ? '🔇' : '🔈';
-    if (audioEl) audioEl.volume = m ? 0 : 0.35;
-    if (master && ctx) {
-      master.gain.linearRampToValueAtTime(m ? 0 : 0.14, ctx.currentTime + 0.6);
-      if (!m && ctx.state === 'suspended') ctx.resume();
-    }
+    btn.textContent = m ? '🔇' : '🔊';
+    if (audio) audio.volume = m ? 0 : 0.3;
   }
 
-  // начинаем после первого клика/тапа/нажатия клавиши — так требуют браузеры,
-  // AudioContext создаётся синхронно внутри этого же обработчика
   function firstGesture() {
     startAudio();
     document.removeEventListener('pointerdown', firstGesture);
@@ -1047,7 +1106,8 @@ footer strong { color:var(--violet); }
   document.addEventListener('pointerdown', firstGesture, { once:true });
   document.addEventListener('keydown', firstGesture, { once:true });
 
-  btn.addEventListener('click', () => {
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
     startAudio();
     setMuted(!muted);
   });
